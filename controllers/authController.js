@@ -182,24 +182,30 @@ exports.verifyLoginOtp = async (req, res) => {
       { expiresIn: '30d' }
     );
 
+    // Build the base user response object
+    const responseUser = {
+      id: account.user._id,
+      name: account.user.name,
+      phone: account.user.phone,
+      email: account.user.email,
+      role: account.role,
+    };
+
+    // If vendor, inject kyc_status
+    if (account.role === 'vendor') {
+      responseUser.kyc_status = account.user.kyc_status || 'NOT_SUBMITTED';
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Login successful',
       token,
-      user: {
-        id: account.user._id,
-        name: account.user.name,
-        phone: account.user.phone,
-        email: account.user.email,
-        role: account.role,
-      },
+      user: responseUser,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// Add this inside controllers/authController.js
 
 exports.resendOtp = async (req, res) => {
   try {

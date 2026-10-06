@@ -1,9 +1,17 @@
+// middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 
 exports.protect = (req, res, next) => {
   let token;
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
+  const authHeader = req.headers.authorization;
+
+  if (authHeader) {
+    // If sent as "Bearer <token>", extract token; otherwise take the raw string
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else {
+      token = authHeader.trim();
+    }
   }
 
   if (!token) {
