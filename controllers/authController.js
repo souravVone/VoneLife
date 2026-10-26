@@ -194,6 +194,7 @@ exports.verifyLoginOtp = async (req, res) => {
     // If vendor, inject kyc_status
     if (account.role === 'vendor') {
       responseUser.kyc_status = account.user.kyc_status || 'NOT_SUBMITTED';
+      responseUser.status = account.user.status || 'active';
     }
 
     return res.status(200).json({

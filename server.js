@@ -14,6 +14,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const trackingRoutes = require('./routes/trackingRoutes');
+
+// Mount under /api/tracking
+app.use('/api/tracking', trackingRoutes);
+
+const captainRoutes = require('./routes/captainRoutes');
+
+app.use('/api/captain', captainRoutes);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/vendor', vendorRoutes);
@@ -41,6 +50,7 @@ app.listen(PORT, () => {
 
 app.use('/api/customer', require('./routes/customerRoutes'));
 app.use('/api/vendor', require('./routes/vendorRoutes'));
+app.use('/api/common', require('./routes/commonRoutes'));
 
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);

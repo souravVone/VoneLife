@@ -1,5 +1,74 @@
 const Vendor = require('../models/Vendor');
+const Booking = require('../models/Booking');
 
+// Monitor All Bookings with Filter
+exports.getAllPlatformBookings = async (req, res) => {
+  try {
+    const { status, city } = req.query;
+    const filter = {};
+
+    if (status) filter.status = status.toUpperCase();
+    if (city) filter['customer_address.city'] = { $regex: new RegExp(`^${city}$`, 'i') };
+
+    const bookings = await Booking.find(filter)
+      .populate('customer_id', 'name phone')
+      .populate('assigned_vendor_id', 'name phone kyc_details.city')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      bookings,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Toggle Vendor Block Status (Enhanced with reason & timestamp)
+exports.toggleVendorBlockStatus = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { status, reason } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required ("active" or "blocked").',
+      });
+    }
+
+    const cleanStatus = status.toLowerCase().trim();
+
+    if (!['active', 'blocked'].includes(cleanStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status must be either "active" or "blocked".',
+      });
+    }
+
+    const updatePayload = {
+      status: cleanStatus,
+      block_reason: cleanStatus === 'blocked' ? (reason ? reason.trim() : 'Blocked by administrator') : '',
+      blocked_at: cleanStatus === 'blocked' ? new Date() : null,
+    };
+
+    const vendor = await Vendor.findByIdAndUpdate(vendorId, updatePayload, { new: true })
+      .select('name phone status block_reason blocked_at kyc_status');
+
+    if (!vendor) {
+      return res.status(404).json({ success: false, message: 'Vendor not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Vendor account has been ${cleanStatus === 'blocked' ? 'blocked' : 'unblocked'} successfully.`,
+      vendor,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 exports.getVendorsByKycStatus = async (req, res) => {
   try {
@@ -39,13 +108,19 @@ exports.getVendorsByKycStatus = async (req, res) => {
 // 1. Get Pending KYC Submissions
 exports.getPendingKycList = async (req, res) => {
   try {
-    const pendingVendors = await Vendor.find({ kyc_status: 'PENDING_VERIFICATION' })
-      .select('-__v');
+    const { entity_type } = req.query;
+
+    const query = { kyc_status: 'PENDING_VERIFICATION' };
+    if (entity_type) {
+      query.entity_type = entity_type.toUpperCase();
+    }
+
+    const vendors = await Vendor.find(query).sort({ updatedAt: -1 });
 
     return res.status(200).json({
       success: true,
-      count: pendingVendors.length,
-      vendors: pendingVendors,
+      count: vendors.length,
+      vendors,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

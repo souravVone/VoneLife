@@ -1,12 +1,12 @@
 // middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
+const Vendor = require('../models/Vendor');
 
 exports.protect = (req, res, next) => {
   let token;
   const authHeader = req.headers.authorization;
 
   if (authHeader) {
-    // If sent as "Bearer <token>", extract token; otherwise take the raw string
     if (authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
     } else {
@@ -28,13 +28,29 @@ exports.protect = (req, res, next) => {
 };
 
 exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `Role (${req.user.role}) is not allowed to access this resource`,
-      });
+  return async (req, res, next) => { // <--- Added async here
+    try {
+      if (!roles.includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          message: `Role (${req.user.role}) is not allowed to access this resource`,
+        });
+      }
+
+      // Live account check for vendors
+      if (req.user.role === 'vendor') {
+        const vendor = await Vendor.findById(req.user.userId).select('status');
+        if (vendor && vendor.status === 'blocked') {
+          return res.status(403).json({
+            success: false,
+            message: 'Your vendor account has been suspended by administration. Please contact support.',
+          });
+        }
+      }
+
+      next();
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
     }
-    next();
   };
 };
