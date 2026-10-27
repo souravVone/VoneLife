@@ -4,6 +4,114 @@ const Booking = require('../models/Booking');
 const { calculateDistanceInMeters } = require('../utils/distance');
 const Captain = require('../models/Captain');
 
+// --- Vendor History & Earnings Ledger ---
+exports.getVendorJobHistory = async (req, res) => {
+  try {
+    const vendorId = req.user.userId;
+
+    const history = await Booking.find({
+      assigned_vendor_id: vendorId,
+      status: { $in: ['COMPLETED', 'CANCELLED'] },
+    })
+      .select('-start_otp -completion_otp')
+      .populate('assigned_captain_id', 'name phone')
+      .populate('customer_id', 'name phone')
+      .sort({ updatedAt: -1 });
+
+    const completed = history.filter((j) => j.status === 'COMPLETED');
+    const cancelled = history.filter((j) => j.status === 'CANCELLED');
+
+    // Aggregate gross revenue from completed bookings
+    const grossEarnings = completed.reduce((sum, item) => {
+      return sum + (item.pricing?.total_amount || 0);
+    }, 0);
+
+    return res.status(200).json({
+      success: true,
+      count: history.length,
+      metrics: {
+        total_completed: completed.length,
+        total_cancelled: cancelled.length,
+        gross_earnings: grossEarnings,
+      },
+      jobs: history,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.cancelVendorJob = async (req, res) => {
+  try {
+    const vendorId = req.user.userId;
+    const { bookingId } = req.params;
+    const { reason, action } = req.body; // action: 'RE_BROADCAST' (default) or 'HARD_CANCEL'
+
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      assigned_vendor_id: vendorId,
+    });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Assigned job not found.' });
+    }
+
+    // Guard: Work already started cannot be cancelled via this endpoint
+    if (['IN_PROGRESS', 'COMPLETED'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel an active or completed service. Contact platform dispatch operations.',
+      });
+    }
+
+    if (booking.status === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Job is already cancelled.' });
+    }
+
+    // Default action: Release back to pool so another vendor can take it
+    if (action !== 'HARD_CANCEL') {
+      booking.status = 'BROADCASTED';
+      booking.assigned_vendor_id = null;
+      booking.start_otp = null;
+      booking.completion_otp = null;
+      
+      // Track that this vendor rejected/abandoned it
+      if (!booking.rejected_by_vendors) booking.rejected_by_vendors = [];
+      booking.rejected_by_vendors.push(vendorId);
+
+      await booking.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Job unassigned and returned to the broadcast pool for other partners.',
+        status: booking.status,
+      });
+    }
+
+    // Hard cancellation (e.g., customer address was unreachable or fraudulent)
+    booking.status = 'CANCELLED';
+    booking.start_otp = null;
+    booking.completion_otp = null;
+    booking.cancellation = {
+      is_cancelled: true,
+      cancelled_by: 'VENDOR',
+      cancelled_by_id: vendorId,
+      reason: reason || 'Cancelled by provider due to unforeseen constraints',
+      cancelled_at: new Date(),
+    };
+
+    await booking.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job marked as cancelled.',
+      status: booking.status,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // --- 1. Get All Active Jobs Claimed by Company Captains ---
 exports.getCompanyActiveJobs = async (req, res) => {
     try {

@@ -11,6 +11,7 @@ router.get('/bookings', protect, authorize('customer'), getMyBookings);
 router.patch('/bookings/:bookingId/cancel', protect, authorize('customer'), cancelBookingByCustomer);
 router.post('/bookings/:bookingId/review', protect, authorize('customer'), submitBookingReview);
 
+// routes/customerRoutes.js
 router.get('/slots', getOperationalSlots);
 
 module.exports = router;

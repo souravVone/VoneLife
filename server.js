@@ -54,3 +54,6 @@ app.use('/api/common', require('./routes/commonRoutes'));
 
 const adminRoutes = require('./routes/adminRoutes');
 app.use('/api/admin', adminRoutes);
+
+const uploadRoutes = require('./routes/uploadRoutes');
+app.use('/api/upload', require('./routes/uploadRoutes'));

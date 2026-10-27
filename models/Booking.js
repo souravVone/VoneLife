@@ -91,6 +91,19 @@ const bookingSchema = new mongoose.Schema(
             },
         },
 
+        // Add these fields to your Booking schema in models/Booking.js if not already present
+            cancellation: {
+            is_cancelled: { type: Boolean, default: false },
+            cancelled_by: { 
+                type: String, 
+                enum: ['CUSTOMER', 'VENDOR', 'CAPTAIN', 'COMPANY', 'ADMIN', null], 
+                default: null 
+            },
+            cancelled_by_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+            reason: { type: String, default: null },
+            cancelled_at: { type: Date, default: null }
+            },
+
         // Add inside the Booking schema in models/Booking.js:
         live_tracking: {
             is_active: {

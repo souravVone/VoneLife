@@ -3,6 +3,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+/* ======================================================
+   1. LOCAL DISK STORAGE (For existing local KYC handlers)
+====================================================== */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let folder = 'uploads/general';
@@ -43,7 +46,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const fileFilter = (req, file, cb) => {
+const diskFileFilter = (req, file, cb) => {
   const allowedExts = ['.jpg', '.jpeg', '.png', '.pdf'];
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowedExts.includes(ext)) {
@@ -53,14 +56,14 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
+const diskUpload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
-  fileFilter,
+  fileFilter: diskFileFilter,
 });
 
-// Individual KYC Uploads
-const uploadIndividualDocs = upload.fields([
+// Existing local disk upload groupings
+const uploadIndividualDocs = diskUpload.fields([
   { name: 'aadhar_front', maxCount: 1 },
   { name: 'aadhar_back', maxCount: 1 },
   { name: 'voter_id', maxCount: 1 },
@@ -69,33 +72,66 @@ const uploadIndividualDocs = upload.fields([
   { name: 'statutory_annexures', maxCount: 1 },
 ]);
 
-// Company KYC Uploads (Now includes primary captain registration files)
-const uploadCompanyDocs = upload.fields([
-  // Company Documents
-  { name: 'incorporation_proof', maxCount: 1 },    // Required
-  { name: 'company_pan_file', maxCount: 1 },       // Required
-  { name: 'business_address_proof', maxCount: 1 }, // Required
-  { name: 'authorization_letter', maxCount: 1 },  // Required
-  { name: 'cancelled_cheque', maxCount: 1 },       // Required
-  { name: 'gst_certificate', maxCount: 1 },       // Optional
-  { name: 'msme_certificate', maxCount: 1 },      // Optional
-  { name: 'trade_license_file', maxCount: 1 },     // Optional
-
-  // First Captain Documents (Auto-approved during company KYC)
-  { name: 'captain_aadhar_card', maxCount: 1 },    // Required
-  { name: 'captain_pan_card', maxCount: 1 },       // Required
-  { name: 'captain_selfie', maxCount: 1 },         // Required
-]);
-
-// Standalone Captain Document Upload
-const uploadCaptainDocs = upload.fields([
+const uploadCompanyDocs = diskUpload.fields([
+  { name: 'incorporation_proof', maxCount: 1 },
+  { name: 'company_pan_file', maxCount: 1 },
+  { name: 'business_address_proof', maxCount: 1 },
+  { name: 'authorization_letter', maxCount: 1 },
+  { name: 'cancelled_cheque', maxCount: 1 },
+  { name: 'gst_certificate', maxCount: 1 },
+  { name: 'msme_certificate', maxCount: 1 },
+  { name: 'trade_license_file', maxCount: 1 },
   { name: 'captain_aadhar_card', maxCount: 1 },
   { name: 'captain_pan_card', maxCount: 1 },
   { name: 'captain_selfie', maxCount: 1 },
 ]);
+
+const uploadCaptainDocs = diskUpload.fields([
+  { name: 'captain_aadhar_card', maxCount: 1 },
+  { name: 'captain_pan_card', maxCount: 1 },
+  { name: 'captain_selfie', maxCount: 1 },
+]);
+
+
+/* ======================================================
+   2. MEMORY STORAGE (Dedicated for Cloudinary Streaming)
+====================================================== */
+const memoryStorage = multer.memoryStorage();
+
+const memoryFileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'application/pdf',
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file format. Only JPEG, PNG, WEBP images and PDF files are allowed.'), false);
+  }
+};
+
+const memoryUpload = multer({
+  storage: memoryStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: memoryFileFilter,
+});
+
+
+/* ======================================================
+   3. EXPORTS
+====================================================== */
 module.exports = {
+  // Existing local disk uploaders
   uploadIndividualDocs,
   uploadCompanyDocs,
   uploadCaptainDocs,
   kycUploadFields: uploadIndividualDocs,
+
+  // New Cloudinary memory uploader
+  memoryUpload,
 };

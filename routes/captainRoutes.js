@@ -14,7 +14,7 @@ const {
   getMyActiveCaptainJob,
   markCaptainArrived,
   startCaptainService,
-  completeCaptainService,
+  completeCaptainService, cancelCaptainJob, getCaptainJobHistory
 } = require('../controllers/captainJobController');
 
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -31,5 +31,8 @@ router.post('/jobs/:bookingId/accept', protect, authorize('captain'), acceptCapt
 router.post('/jobs/:bookingId/arrive', protect, authorize('captain'), markCaptainArrived);
 router.post('/jobs/:bookingId/start', protect, authorize('captain'), startCaptainService);
 router.post('/jobs/:bookingId/complete', protect, authorize('captain'), completeCaptainService);
+// routes/captainRoutes.js
+router.post('/jobs/:bookingId/cancel', protect, authorize('captain'), cancelCaptainJob);
+router.get('/jobs/history', protect, authorize('captain'), getCaptainJobHistory);
 
 module.exports = router;

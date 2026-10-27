@@ -19,7 +19,7 @@ const {
     getCompanyCaptains,
     onboardAdditionalCaptain,
     removeCaptain,
-    getCompanyActiveJobs, getCompanyCaptainsStatus,
+    getCompanyActiveJobs, getCompanyCaptainsStatus, cancelVendorJob, getVendorJobHistory
 } = require('../controllers/vendorController');
 
 // 2. Consistent middleware imports (adjust path to 'middleware' or 'middlewares' to match your folder name)
@@ -65,5 +65,8 @@ router.delete('/captains/:captainId', protect, authorize('vendor'), removeCaptai
 // Supervisor routes for parent vendor companies
 router.get('/company/active-jobs', protect, authorize('vendor'), getCompanyActiveJobs);
 router.get('/company/captains/status', protect, authorize('vendor'), getCompanyCaptainsStatus);
+// routes/vendorRoutes.js
+router.post('/jobs/:bookingId/cancel', protect, authorize('vendor'), cancelVendorJob);
+router.get('/jobs/history', protect, authorize('vendor'), getVendorJobHistory);
 
 module.exports = router;

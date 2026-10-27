@@ -4,6 +4,78 @@ const Captain = require('../models/Captain');
 const Vendor = require('../models/Vendor');
 const { calculateDistanceInMeters } = require('../utils/distance');
 
+
+exports.getCaptainJobHistory = async (req, res) => {
+  try {
+    const captainId = req.user.userId;
+
+    const history = await Booking.find({
+      assigned_captain_id: captainId,
+      status: { $in: ['COMPLETED', 'CANCELLED'] },
+    })
+      .select('-start_otp -completion_otp')
+      .populate('customer_id', 'name phone')
+      .sort({ updatedAt: -1 });
+
+    const totalCompleted = history.filter((j) => j.status === 'COMPLETED').length;
+    const totalCancelled = history.filter((j) => j.status === 'CANCELLED').length;
+
+    return res.status(200).json({
+      success: true,
+      count: history.length,
+      metrics: {
+        total_completed: totalCompleted,
+        total_cancelled: totalCancelled,
+      },
+      jobs: history,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.cancelCaptainJob = async (req, res) => {
+  try {
+    const captainId = req.user.userId;
+    const { bookingId } = req.params;
+    const { reason } = req.body;
+
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      assigned_captain_id: captainId,
+    });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Assigned job not found for this captain.' });
+    }
+
+    if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel job in ${booking.status} status. Contact company dispatcher.`,
+      });
+    }
+
+    // Re-release to company dispatch queue so parent company vendor can reassign another captain
+    booking.assigned_captain_id = null;
+    booking.status = 'ASSIGNED'; // Remains assigned to the parent company, needs new captain
+    booking.start_otp = null;
+
+    if (!booking.rejected_by_captains) booking.rejected_by_captains = [];
+    booking.rejected_by_captains.push(captainId);
+
+    await booking.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job unassigned from captain and returned to company fleet pool.',
+      status: booking.status,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // --- 1. Captain Job Discovery Feed ---
 exports.getAvailableCaptainJobs = async (req, res) => {
   try {

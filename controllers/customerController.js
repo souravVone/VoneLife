@@ -3,6 +3,7 @@ const Booking = require('../models/Booking');
 const Vendor = require('../models/Vendor');
 const { ALLOWED_SLOTS, getLocalDateString, isDateWithinMaxDays, findSlot } = require('../utils/slotHelper');
 
+
 // Fetch customer booking details with dynamic provider info and protected OTP reveal
 exports.getCustomerBookingDetails = async (req, res) => {
     try {
@@ -253,7 +254,7 @@ exports.cancelBookingByCustomer = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found.' });
         }
 
-        if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(booking.status)) {
+        if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED','ARRIVED'].includes(booking.status)) {
             return res.status(400).json({
                 success: false,
                 message: `Booking cannot be cancelled when status is ${booking.status}.`,
@@ -381,8 +382,8 @@ exports.resendStartOtpByCustomer = async (req, res) => {
             const secondsPassed = Math.floor((now - new Date(booking.otp_generated_at)) / 1000);
             if (secondsPassed < 60) {
                 return res.status(429).json({
-                    success: false,
-                    message: `Please wait ${60 - secondsPassed} seconds before requesting a new OTP.`,
+                success: false,
+                message: `Please wait ${60 - secondsPassed} seconds before requesting a new OTP.`,
                 });
             }
         }
